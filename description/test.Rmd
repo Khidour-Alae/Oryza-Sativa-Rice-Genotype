@@ -1,0 +1,122 @@
+---
+title: "TEST"
+author: "Adib Habbou - Alae Khidour"
+date: "2022-11-15"
+output: pdf_document
+---
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = NA, warning = FALSE)
+rm(list=ls())
+graphics.off()
+```
+
+## Data Import
+
+```{r}
+load(file="project_park.RData")
+```
+
+## Data Size
+
+```{r}
+dim(geno.df)
+```
+
+```{r}
+dim(pheno.df)
+```
+
+```{r}
+dim(Xmat)
+```
+
+## Y names
+
+```{r}
+names(pheno.df)
+```
+
+## Choice of Y
+
+```{r}
+# Plant.height
+i = 14
+y = matrix(pheno.df[,i])
+yname = names(pheno.df)[i]
+summary(y)
+```
+
+```{r}
+hist(y, main = "Frequency of plant height", xlab = "Height (cm)", col = "chartreuse3")
+```
+
+```{r}
+# Flag.leaf.length
+i = 10
+y = matrix(pheno.df[,i])
+yname = names(pheno.df)[i]
+summary(y)
+```
+
+```{r}
+hist(y, main = "Frequency of flag leaf length", xlab = "Length (cm)", col = "chartreuse3")
+```
+
+```{r}
+# Flag.leaf.width
+i = 11
+y = matrix(pheno.df[,i])
+yname = names(pheno.df)[i]
+summary(y)
+```
+
+```{r}
+hist(y, main = "Frequency of flag leaf width", xlab = "Width (cm)", col = "chartreuse3")
+```
+
+## Sample of data
+
+```{r}
+Xmat[1:5,1:5]
+```
+
+```{r}
+geno.df[1:5,1:10]
+```
+
+## Plot of NA
+
+```{r}
+library(naniar)
+library(ggplot2)
+gg_miss_var(pheno.df) + labs(y = "Number of missing values") + ggtitle("Number of missing values for each variable")
+```
+
+## Imputation of NA in Y
+
+```{r}
+Y <- pheno.df["Plant.height"]
+mean <- mean(Y[!is.na(Y)])
+Plant.height.is.missing <- vector(length = nrow(Y))
+for (i in 1:nrow(Y))
+{
+  if (is.na(Y[i,1])) 
+  {
+    Plant.height.is.missing[i] <- 1
+    Y[i,1] <- mean
+  }
+}
+Plant.height <- cbind(Y,Plant.height.is.missing)
+knitr::kable(Plant.height[10:18,], , caption = "Sample of our final target variable")
+```
+
+```{r}
+new_X <- read.csv("bio_data.csv")
+```
+
+```{r}
+knitr::kable(new_X[1:10,1:5], caption = "Sample of our final dataset")
+```

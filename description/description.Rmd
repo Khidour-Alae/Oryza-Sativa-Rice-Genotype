@@ -1,0 +1,230 @@
+---
+title: "Data Analysis"
+author: "Adib Habbou - Alae Khidour"
+date: "2022-11-07"
+output: pdf_document
+---
+
+## Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = NA, warning = FALSE)
+rm(list=ls())
+graphics.off()
+```
+
+## Data Import
+
+```{r}
+load(file="project_park.RData")
+```
+
+## Data Size
+
+```{r}
+dim(geno.df)
+```
+
+```{r}
+dim(pheno.df)
+```
+
+```{r}
+dim(Xmat)
+```
+
+## Y names
+
+```{r}
+names(pheno.df)
+```
+
+## Choice of Y
+
+```{r}
+# Plant.height
+i = 14
+y = matrix(pheno.df[,i])
+yname = names(pheno.df)[i]
+summary(y)
+```
+
+```{r}
+hist(y, main = "Frequency of plant height", xlab = "Height (cm)", col = "chartreuse3")
+```
+
+```{r}
+# Flag.leaf.length
+i = 10
+y = matrix(pheno.df[,i])
+yname = names(pheno.df)[i]
+summary(y)
+```
+
+```{r}
+hist(y, main = "Frequency of flag leaf length", xlab = "Length (cm)", col = "chartreuse3")
+```
+
+```{r}
+# Flag.leaf.width
+i = 11
+y = matrix(pheno.df[,i])
+yname = names(pheno.df)[i]
+summary(y)
+```
+
+```{r}
+hist(y, main = "Frequency of flag leaf width", xlab = "Width (cm)", col = "chartreuse3")
+```
+
+## Sample of data
+
+```{r}
+Xmat[1:5,1:5]
+```
+
+```{r}
+geno.df[1:5,1:10]
+```
+
+## Plot of NA
+
+```{r}
+library(naniar)
+library(ggplot2)
+data<- pheno.df[,c(10,11,14,5,9,7,37,38,36,4,33,34,6,32,13,12,3,16,20,21,22,23)]
+a <- c(rep("black", 3), "firebrick1","firebrick1","firebrick1", rep("black", length(data)-6))
+gg_miss_var(data) +
+  labs(y = "Number of missing values") + ggtitle("Number of missing values for each variable") +
+  theme(axis.text.y = element_text(colour = a))
+```
+
+## Imputation of NA in Y
+
+```{r}
+Y <- pheno.df["Plant.height"]
+mean <- mean(Y[!is.na(Y)])
+Plant.height.is.missing <- vector(length = nrow(Y))
+for (i in 1:nrow(Y))
+{
+  if (is.na(Y[i,1])) 
+  {
+    Plant.height.is.missing[i] <- 1
+    Y[i,1] <- mean
+  }
+}
+Plant.height <- cbind(Y,Plant.height.is.missing)
+knitr::kable(head(Plant.height))
+```
+
+```{r}
+Y <- pheno.df["Flag.leaf.length"]
+mean <- mean(Y[!is.na(Y)])
+Flag.leaf.length.is.missing <- vector(length = nrow(Y))
+for (i in 1:nrow(Y))
+{
+  if (is.na(Y[i,1])) 
+  {
+    Flag.leaf.length.is.missing[i] <- 1
+    Y[i,1] <- mean
+  }
+}
+Flag.leaf.length <- cbind(Y,Flag.leaf.length.is.missing)
+knitr::kable(head(Flag.leaf.length))
+```
+
+```{r}
+Y <- pheno.df["Flag.leaf.width"]
+mean <- mean(Y[!is.na(Y)])
+Flag.leaf.width.is.missing <- vector(length = nrow(Y))
+for (i in 1:nrow(Y))
+{
+  if (is.na(Y[i,1])) 
+  {
+    Flag.leaf.width.is.missing[i] <- 1
+    Y[i,1] <- mean
+  }
+}
+Flag.leaf.width <- cbind(Y,Flag.leaf.width.is.missing)
+knitr::kable(head(Flag.leaf.width))
+```
+
+
+## Imputation of NA in Xmat
+
+```{r}
+X <- as.data.frame(Xmat)
+dim(X)
+```
+
+```{r}
+sum(is.na(X))
+```
+
+
+```{r}
+X_no_NA <- t(na.omit(t(X)))
+dim(X_no_NA)
+```
+
+```{r}
+X_NA <- X[,-X_no_NA]
+dim(X_NA)
+```
+
+```{r}
+rows_to_drop <- c()
+for (i in 1:nrow(X))
+{
+  if (mean(is.na(X[i,])) * 100 > 10) rows_to_drop <- c(rows_to_drop, i)
+  if (mean(X[i,][!is.na(X[i,])] == rep(2, length(X[i,][!is.na(X[i,])]))) * 100 < 0.1) rows_to_drop <- c(rows_to_drop, i)
+}
+```
+
+```{r}
+new_X <- X[-rows_to_drop,]
+```
+
+```{r}
+target <- cbind(Plant.height, Flag.leaf.length, Flag.leaf.width)
+dim(target)
+```
+
+```{r}
+new_target <- target[-rows_to_drop,]
+dim(new_target)
+```
+
+```{r}
+write.csv(new_target, "bio_target.csv")
+```
+
+```{r}
+library(tidyr)
+for (j in 1:ncol(new_X))
+{
+  mean <- mean(new_X[,j], na.rm = TRUE)
+  if (mean > 1) new_X[,j] <- replace_na(new_X[,j], 2)
+  else new_X[,j] <- replace_na(new_X[,j], 0)
+}
+```
+
+```{r}
+write.csv(new_X, "bio_data.csv")
+```
+
+```{r}
+new_X <- read.csv("bio_data.csv")
+```
+
+```{r}
+knitr::kable(new_X[1:10,1:10])
+```
+
+
+
+
+
+
+
+

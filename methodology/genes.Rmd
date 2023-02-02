@@ -1,0 +1,23 @@
+---
+title: "Data Analysis"
+author: "Adib Habbou - Alae Khidour"
+date: "2022-11-07"
+output: pdf_document
+---
+
+```{r}
+measure <- t(data.frame(R² = c(0.51,0.92,0.85,0.91,0.81), 
+                        row.names = c("Ridge", "Lasso", expression("Elastic-Net $\alpha = 0.5$"), "Group-Lasso", "Support Vector Regression")))
+```
+
+```{r}
+knitr::kable(measure, caption = "R² results for each model", format = "pipe", align = "c")
+```
+
+
+
+
+
+
+
+

@@ -1,0 +1,228 @@
+---
+title: "Data Analysis"
+author: "Adib Habbou - Alae Khidour"
+date: "2022-11-07"
+output: pdf_document
+---
+
+# Data Importation
+
+```{r}
+bio_data <- read.csv("bio_data.csv")
+bio_target <- read.csv("bio_target.csv")
+```
+
+```{r}
+Plant.height <- bio_target$Plant.height
+plant_height <- cbind(bio_data, Plant.height)
+```
+
+```{r}
+plant_height_forward <- step(lm(Plant.height ~ 1, data = plant_height), direction = "forward",
+                             list(upper = formula(Plant.height ~ ., data = plant_height)))
+```
+
+```{r}
+plant_height_forward <- step(lm(Plant.height ~ 1, data = plant_height), direction = "forward",
+                             list(upper = lm(Plant.height ~ ., data = plant_height)))
+```
+
+
+# Simple Regression
+
+```{r}
+plant_height <- cbind(bio_data[,2:12300], Plant.height)
+plant_height_simple <- lm(formula = Plant.height ~ ., data = plant_height)
+na_var <- c()
+index <- 0
+for (x in plant_height_simple$coefficients)
+{
+  index <- index + 1
+  if (is.na(x)) na_var <- c(na_var, index)
+}
+plant_height_1 <- bio_data[,2:12300][,-(na_var-1)]
+```
+
+```{r}
+plant_height <- cbind(bio_data[,12300:24600], Plant.height)
+plant_height_simple <- lm(formula = Plant.height ~ ., data = plant_height)
+na_var <- c()
+index <- 0
+for (x in plant_height_simple$coefficients)
+{
+  index <- index + 1
+  if (is.na(x)) na_var <- c(na_var, index)
+}
+plant_height_2 <- bio_data[,12300:24600][,-(na_var-1)]
+```
+
+```{r}
+plant_height <- cbind(bio_data[,24600:36902], Plant.height)
+plant_height_simple <- lm(formula = Plant.height ~ ., data = plant_height)
+na_var <- c()
+index <- 0
+for (x in plant_height_simple$coefficients)
+{
+  index <- index + 1
+  if (is.na(x)) na_var <- c(na_var, index)
+}
+plant_height_3 <- bio_data[,24600:36902][,-(na_var-1)]
+```
+
+```{r}
+plant_height_drop <- cbind(plant_height_1, plant_height_2, plant_height_3, Plant.height)
+```
+
+```{r}
+plant_height_forward <- step(lm(Plant.height ~ 1, data = plant_height_drop), direction = "forward",
+                             list(upper = lm(Plant.height ~ ., data = plant_height_drop)))
+```
+
+```{r}
+plant_height_stepwise <- step(lm(Plant.height ~ 1, data = plant_height_drop), direction = "both",
+                             list(upper = lm(Plant.height ~ ., data = plant_height_drop)))
+```
+
+```{r}
+variables <- row.names(as.data.frame(plant_height_stepwise$coefficients))
+data_selected <- data.frame(plant_height[variables[2]])
+for (i in 3:length(variables))
+{
+  data_selected <- cbind(data_selected, plant_height[variables[i]])
+}
+```
+
+```{r}
+library(glmnet)
+```
+
+# Ridge Regression
+
+```{r}
+ridge <- glmnet(x = data_selected, y = Plant.height, alpha = 0, family = "gaussian")
+plot(ridge, xvar = "lambda", label = FALSE, lwd = 0.5)
+```
+
+```{r}
+cv_ridge <- cv.glmnet(as.matrix(data_selected), Plant.height, 
+                      family = "gaussian", alpha = 0, type.measure = "mse")
+plot(cv_ridge)
+```
+
+```{r}
+ridge_lambda_1se <- cv_ridge$lambda.1se
+ridge_1se <- glmnet(x = data_selected, y = Plant.height, 
+                    alpha = 0, family = "gaussian", lambda = ridge_lambda_1se)
+prediction <- predict(ridge_1se, as.matrix(data_selected), type = "response")
+R2_ridge <- 1 - sum((Plant.height - prediction)^2)/sum((Plant.height - mean(Plant.height))^2)
+R2_ridge
+```
+
+# Lasso Regression
+
+```{r}
+lasso <- glmnet(x = data_selected, y = Plant.height, alpha = 1, family = "gaussian")
+plot(lasso, xvar = "lambda", label = FALSE, lwd = 0.5)
+```
+
+```{r}
+cv_lasso <- cv.glmnet(as.matrix(data_selected), Plant.height, 
+                      family = "gaussian", alpha = 1, type.measure = "mse")
+plot(cv_lasso)
+```
+
+```{r}
+lasso_lambda_1se <- cv_lasso$lambda.1se
+lasso_1se <- glmnet(x = data_selected, y = Plant.height, 
+                    alpha = 1, family = "gaussian", lambda = lasso_lambda_1se)
+prediction <- predict(lasso_1se, as.matrix(data_selected), type = "response")
+R2_lasso <- 1 - sum((Plant.height - prediction)^2)/sum((Plant.height - mean(Plant.height))^2)
+R2_lasso
+```
+
+# Elastic Net
+
+```{r}
+elastic_net <- glmnet(x = data_selected, y = Plant.height, alpha = 0.5, family = "gaussian")
+plot(elastic_net, xvar = "lambda", label = FALSE, lwd = 0.5)
+```
+
+```{r}
+cv_elastic_net <- cv.glmnet(as.matrix(data_selected), Plant.height, 
+                      family = "gaussian", alpha = 0.5, type.measure = "mse")
+plot(cv_elastic_net)
+```
+
+```{r}
+elastic_net_lambda_1se <- cv_elastic_net$lambda.1se
+elastic_net_1se <- glmnet(x = data_selected, y = Plant.height, 
+                    alpha = 1, family = "gaussian", lambda = elastic_net_lambda_1se)
+prediction <- predict(elastic_net_1se, as.matrix(data_selected), type = "response")
+R2_elastic_net <- 1 - sum((Plant.height - prediction)^2)/sum((Plant.height - mean(Plant.height))^2)
+R2_elastic_net
+```
+
+# Group-Lasso
+
+```{r}
+library(gglasso)
+```
+
+```{r}
+group_lasso <- gglasso(x = as.matrix(data_selected), y = Plant.height, loss = "ls")
+plot(group_lasso , xvar = "lambda", label = FALSE, lwd = 0.5)
+```
+
+```{r}
+cv_group_lasso <- cv.gglasso(x = as.matrix(data_selected), y = Plant.height, 
+                             group = group_lasso$group)
+plot(cv_group_lasso)
+```
+
+```{r}
+group_lasso_lambda_1se <- cv_group_lasso$lambda.1se
+group_lasso_1se <- gglasso(x = as.matrix(data_selected), y = Plant.height, 
+                           loss = "ls", lambda = elastic_net_lambda_1se)
+prediction <- predict(group_lasso_1se, as.matrix(data_selected), type = "link")
+R2_group_lasso <- 1 - sum((Plant.height - prediction)^2)/sum((Plant.height - mean(Plant.height))^2)
+R2_group_lasso
+```
+
+# Support Vector Regression
+
+```{r}
+library(e1071)
+```
+
+
+```{r}
+svr <- svm(Plant.height ~ ., data = cbind(data_selected, Plant.height))
+plot(svr, data = data_selected)
+```
+
+```{r}
+prediction <- predict(svr, data_selected)
+R2_svr <- 1 - sum((Plant.height - prediction)^2)/sum((Plant.height - mean(Plant.height))^2)
+R2_svr
+```
+
+# Important Genetoypes
+
+```{r}
+coef <- coef(cv_lasso, s = cv_lasso$lambda.min)
+id_genes <- c()
+for (i in 2:length(coef))
+{
+  if (coef[i] != 0) id_genes <- c(id_genes, i)
+}
+names <- row.names(coef)
+genes <- c()
+for (i in id_genes)
+{
+  genes <- c(genes, names[i])
+}
+genes
+```
+
+
+

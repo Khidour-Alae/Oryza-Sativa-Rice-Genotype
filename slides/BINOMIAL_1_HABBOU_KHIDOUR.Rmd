@@ -1,0 +1,464 @@
+---
+title: "MERR - Bio Project"
+author: "Adib HABBOU - Alae KHIDOUR"
+date: "2022-11-07"
+output: pdf_document
+---
+
+# Data Exploration
+
+## Data Import
+
+```{r}
+load(file = "project_park.RData")
+```
+
+## Data Size
+
+```{r}
+dim(geno.df)
+```
+
+```{r}
+dim(pheno.df)
+```
+
+```{r}
+dim(Xmat)
+```
+
+## Phenotypes names
+
+```{r}
+names(pheno.df)
+```
+
+## Choice of target variables
+
+```{r}
+# Plant.height
+i = 14
+y = matrix(pheno.df[,i])
+yname = names(pheno.df)[i]
+summary(y)
+```
+
+```{r}
+hist(y, main = "Frequency of plant height", xlab = "Height (cm)", col = "chartreuse3")
+```
+
+```{r}
+# Flag.leaf.length
+i = 10
+y = matrix(pheno.df[,i])
+yname = names(pheno.df)[i]
+summary(y)
+```
+
+```{r}
+hist(y, main = "Frequency of flag leaf length", xlab = "Length (cm)", col = "chartreuse3")
+```
+
+```{r}
+# Flag.leaf.width
+i = 11
+y = matrix(pheno.df[,i])
+yname = names(pheno.df)[i]
+summary(y)
+```
+
+```{r}
+hist(y, main = "Frequency of flag leaf width", xlab = "Width (cm)", col = "chartreuse3")
+```
+
+## Sample of data
+
+```{r}
+Xmat[1:5,1:5]
+```
+
+```{r}
+geno.df[1:5,1:10]
+```
+
+# Data Preparation
+
+## Plot of NA
+
+```{r}
+library(naniar)
+library(ggplot2)
+data<- pheno.df[,c(10,11,14,5,9,7,37,38,36,4,33,34,6,32,13,12,3,16,20,21,22,23)]
+a <- c(rep("black", 3), "firebrick1","firebrick1","firebrick1", rep("black", length(data)-6))
+gg_miss_var(data) +
+  labs(y = "Number of missing values") + 
+  ggtitle("Number of missing values for each variable") +
+  theme(axis.text.y = element_text(colour = a))
+```
+
+## Imputation of NA in target variables
+
+```{r}
+Y <- pheno.df["Plant.height"]
+mean <- mean(Y[!is.na(Y)])
+Plant.height.is.missing <- vector(length = nrow(Y))
+for (i in 1:nrow(Y))
+{
+  if (is.na(Y[i,1])) 
+  {
+    Plant.height.is.missing[i] <- 1
+    Y[i,1] <- mean
+  }
+}
+Plant.height <- cbind(Y,Plant.height.is.missing)
+knitr::kable(head(Plant.height))
+```
+
+```{r}
+Y <- pheno.df["Flag.leaf.length"]
+mean <- mean(Y[!is.na(Y)])
+Flag.leaf.length.is.missing <- vector(length = nrow(Y))
+for (i in 1:nrow(Y))
+{
+  if (is.na(Y[i,1])) 
+  {
+    Flag.leaf.length.is.missing[i] <- 1
+    Y[i,1] <- mean
+  }
+}
+Flag.leaf.length <- cbind(Y,Flag.leaf.length.is.missing)
+knitr::kable(head(Flag.leaf.length))
+```
+
+```{r}
+Y <- pheno.df["Flag.leaf.width"]
+mean <- mean(Y[!is.na(Y)])
+Flag.leaf.width.is.missing <- vector(length = nrow(Y))
+for (i in 1:nrow(Y))
+{
+  if (is.na(Y[i,1])) 
+  {
+    Flag.leaf.width.is.missing[i] <- 1
+    Y[i,1] <- mean
+  }
+}
+Flag.leaf.width <- cbind(Y,Flag.leaf.width.is.missing)
+knitr::kable(head(Flag.leaf.width))
+```
+
+## Imputation of NA in Xmat
+
+```{r}
+X <- as.data.frame(Xmat)
+dim(X)
+```
+
+```{r}
+sum(is.na(X))
+```
+
+```{r}
+X_no_NA <- t(na.omit(t(X)))
+dim(X_no_NA)
+```
+
+```{r}
+X_NA <- X[,-X_no_NA]
+dim(X_NA)
+```
+
+```{r}
+rows_to_drop <- c()
+for (i in 1:nrow(X))
+{
+  if (mean(is.na(X[i,])) * 100 > 10) rows_to_drop <- c(rows_to_drop, i)
+  if (mean(X[i,][!is.na(X[i,])] == rep(2, length(X[i,][!is.na(X[i,])]))) * 100 < 0.1) 
+    rows_to_drop <- c(rows_to_drop, i)
+}
+```
+
+```{r}
+new_X <- X[-rows_to_drop,]
+```
+
+```{r}
+target <- cbind(Plant.height, Flag.leaf.length, Flag.leaf.width)
+dim(target)
+```
+
+```{r}
+new_target <- target[-rows_to_drop,]
+dim(new_target)
+```
+
+```{r}
+write.csv(new_target, "bio_target.csv")
+```
+
+```{r}
+library(tidyr)
+for (j in 1:ncol(new_X))
+{
+  mean <- mean(new_X[,j], na.rm = TRUE)
+  if (mean > 1) new_X[,j] <- replace_na(new_X[,j], 2)
+  else new_X[,j] <- replace_na(new_X[,j], 0)
+}
+```
+
+```{r}
+write.csv(new_X, "bio_data.csv")
+```
+
+## Study of correlation
+
+```{r}
+library(corrplot)
+library(dplyr)
+```
+
+```{r}
+bio_data <- read.csv("bio_data.csv")
+```
+
+```{r}
+corr_simple <- function(data, sig)
+{
+  df_cor <- data %>% mutate_if(is.character, as.factor)
+  df_cor <- df_cor %>% mutate_if(is.factor, as.numeric)
+  
+  corr <- cor(df_cor)
+  corr[lower.tri(corr,diag=TRUE)] <- NA 
+  corr[corr == 1] <- NA
+  
+  corr <- as.data.frame(as.table(corr))
+  corr <- na.omit(corr) 
+  corr <- subset(corr, abs(Freq) > sig) 
+  corr <- corr[order(-abs(corr$Freq)),]
+  
+  print(corr)
+  
+  mtx_corr <- reshape2::acast(corr, Var1~Var2, value.var="Freq")
+  corrplot(mtx_corr, is.corr=FALSE, tl.col="black", na.label=" ", 
+           tl.cex = 0.25, mar=c(0,0,1,0), title="Correlation Plot")
+}
+```
+
+```{r}
+corr_simple(bio_data[, c(1000:1300, 28800:29600, 35500:36000)], 0.998)
+```
+
+# Data Modeling
+
+## Data Importation
+
+```{r}
+bio_target <- read.csv("bio_target.csv")
+```
+
+```{r}
+Plant.height <- bio_target$Plant.height
+plant_height <- cbind(bio_data, Plant.height)
+```
+
+## Simple Regression
+
+```{r}
+plant_height <- cbind(bio_data[,2:12300], Plant.height)
+plant_height_simple <- lm(formula = Plant.height ~ ., data = plant_height)
+na_var <- c()
+index <- 0
+for (x in plant_height_simple$coefficients)
+{
+  index <- index + 1
+  if (is.na(x)) na_var <- c(na_var, index)
+}
+plant_height_1 <- bio_data[,2:12300][,-(na_var-1)]
+```
+
+```{r}
+plant_height <- cbind(bio_data[,12300:24600], Plant.height)
+plant_height_simple <- lm(formula = Plant.height ~ ., data = plant_height)
+na_var <- c()
+index <- 0
+for (x in plant_height_simple$coefficients)
+{
+  index <- index + 1
+  if (is.na(x)) na_var <- c(na_var, index)
+}
+plant_height_2 <- bio_data[,12300:24600][,-(na_var-1)]
+```
+
+```{r}
+plant_height <- cbind(bio_data[,24600:36902], Plant.height)
+plant_height_simple <- lm(formula = Plant.height ~ ., data = plant_height)
+na_var <- c()
+index <- 0
+for (x in plant_height_simple$coefficients)
+{
+  index <- index + 1
+  if (is.na(x)) na_var <- c(na_var, index)
+}
+plant_height_3 <- bio_data[,24600:36902][,-(na_var-1)]
+```
+
+```{r}
+plant_height_drop <- cbind(plant_height_1, plant_height_2, plant_height_3, Plant.height)
+```
+
+## Forward Regression
+
+```{r}
+plant_height_forward <- step(lm(Plant.height ~ 1, data = plant_height_drop), direction = "forward",
+                             list(upper = lm(Plant.height ~ ., data = plant_height_drop)))
+```
+
+## Stepwise Regression
+
+```{r}
+plant_height_stepwise <- step(lm(Plant.height ~ 1, data = plant_height_drop), direction = "both",
+                             list(upper = lm(Plant.height ~ ., data = plant_height_drop)))
+```
+
+## Variable Selection
+
+```{r}
+variables <- row.names(as.data.frame(plant_height_stepwise$coefficients))
+data_selected <- data.frame(bio_data[variables[2]])
+for (i in 3:length(variables))
+{
+  data_selected <- cbind(data_selected, bio_data[variables[i]])
+}
+```
+
+## Ridge Regression
+
+```{r}
+library(glmnet)
+```
+
+```{r}
+ridge <- glmnet(x = data_selected, y = Plant.height, alpha = 0, family = "gaussian")
+plot(ridge, xvar = "lambda", label = FALSE, lwd = 0.5)
+```
+
+```{r}
+cv_ridge <- cv.glmnet(as.matrix(data_selected), Plant.height, 
+                      family = "gaussian", alpha = 0, type.measure = "mse")
+plot(cv_ridge)
+```
+
+```{r}
+ridge_lambda_min <- cv_ridge$lambda.min
+ridge_min <- glmnet(x = data_selected, y = Plant.height, 
+                    alpha = 0, family = "gaussian", lambda = ridge_lambda_min)
+prediction <- predict(ridge_min, as.matrix(data_selected), type = "response")
+R2_ridge <- 1 - sum((Plant.height - prediction)^2)/sum((Plant.height - mean(Plant.height))^2)
+R2_ridge
+```
+
+## Lasso Regression
+
+```{r}
+lasso <- glmnet(x = data_selected, y = Plant.height, alpha = 1, family = "gaussian")
+plot(lasso, xvar = "lambda", label = FALSE, lwd = 0.5)
+```
+
+```{r}
+cv_lasso <- cv.glmnet(as.matrix(data_selected), Plant.height, 
+                      family = "gaussian", alpha = 1, type.measure = "mse")
+plot(cv_lasso)
+```
+
+```{r}
+lasso_lambda_min <- cv_lasso$lambda.min
+lasso_min <- glmnet(x = data_selected, y = Plant.height, 
+                    alpha = 1, family = "gaussian", lambda = lasso_lambda_min)
+prediction <- predict(lasso_min, as.matrix(data_selected), type = "response")
+R2_lasso <- 1 - sum((Plant.height - prediction)^2)/sum((Plant.height - mean(Plant.height))^2)
+R2_lasso
+```
+
+## Elastic Net
+
+```{r}
+elastic_net <- glmnet(x = data_selected, y = Plant.height, alpha = 0.5, family = "gaussian")
+plot(elastic_net, xvar = "lambda", label = FALSE, lwd = 0.5)
+```
+
+```{r}
+cv_elastic_net <- cv.glmnet(as.matrix(data_selected), Plant.height, 
+                      family = "gaussian", alpha = 0.5, type.measure = "mse")
+plot(cv_elastic_net)
+```
+
+```{r}
+elastic_net_lambda_min <- cv_elastic_net$lambda.min
+elastic_net_min <- glmnet(x = data_selected, y = Plant.height, 
+                    alpha = 1, family = "gaussian", lambda = elastic_net_lambda_min)
+prediction <- predict(elastic_net_min, as.matrix(data_selected), type = "response")
+R2_elastic_net <- 1 - sum((Plant.height - prediction)^2)/sum((Plant.height - mean(Plant.height))^2)
+R2_elastic_net
+```
+
+## Group-Lasso
+
+```{r}
+library(gglasso)
+```
+
+```{r}
+group_lasso <- gglasso(x = as.matrix(data_selected), y = Plant.height, loss = "ls")
+plot(group_lasso , xvar = "lambda", label = FALSE, lwd = 0.5)
+```
+
+```{r}
+cv_group_lasso <- cv.gglasso(x = as.matrix(data_selected), y = Plant.height, 
+                             group = group_lasso$group)
+plot(cv_group_lasso)
+```
+
+```{r}
+group_lasso_lambda_min <- cv_group_lasso$lambda.min
+group_lasso_min <- gglasso(x = as.matrix(data_selected), y = Plant.height, 
+                           loss = "ls", lambda = elastic_net_lambda_min)
+prediction <- predict(group_lasso_min, as.matrix(data_selected), type = "link")
+R2_group_lasso <- 1 - sum((Plant.height - prediction)^2)/sum((Plant.height - mean(Plant.height))^2)
+R2_group_lasso
+```
+
+## Support Vector Regression
+
+```{r}
+library(e1071)
+```
+
+```{r}
+svr <- svm(Plant.height ~ ., data = cbind(data_selected, Plant.height))
+plot(svr, data = data_selected)
+```
+
+```{r}
+prediction <- predict(svr, data_selected)
+R2_svr <- 1 - sum((Plant.height - prediction)^2)/sum((Plant.height - mean(Plant.height))^2)
+R2_svr
+```
+
+## Most Important Genetoypes
+
+```{r}
+coef <- coef(cv_lasso)
+id_genes <- c()
+for (i in 2:length(coef))
+{
+  if (coef[i] != 0) id_genes <- c(id_genes, i)
+}
+names <- row.names(coef)
+genes <- c()
+for (i in id_genes)
+{
+  genes <- c(genes, names[i])
+}
+genes
+```
+
+
